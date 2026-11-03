@@ -29,12 +29,16 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp?: string;
+  provider?: string;
+  model?: string;
+  routing_mode?: string;
 }
 
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
   conversation_id?: string;
+  preferred_provider?: "auto" | "gemini" | "openai";
 }
 
 export interface ChatResponse {
@@ -43,6 +47,21 @@ export interface ChatResponse {
   model: string;
   timestamp: string;
   conversation_id?: string;
+  routing_mode?: string;
+}
+
+export interface ProviderInfo {
+  provider: string;
+  configured: boolean;
+  model: string;
+  status: string;
+  tier: string;
+  cost_estimate: string;
+}
+
+export interface ProviderStatusResponse {
+  active_mode: string;
+  providers: Record<string, ProviderInfo>;
 }
 
 const BACKEND_URL =
@@ -94,12 +113,14 @@ export async function getAssistantInfo(): Promise<AssistantInfoResponse> {
 export async function sendChatMessage(
   message: string,
   history: ChatMessage[] = [],
-  conversationId?: string
+  conversationId?: string,
+  preferredProvider?: "auto" | "gemini" | "openai"
 ): Promise<ChatResponse> {
   const payload: ChatRequest = {
     message,
     history,
     conversation_id: conversationId,
+    preferred_provider: preferredProvider,
   };
 
   const response = await fetch(`${BACKEND_URL}/api/chat`, {
@@ -123,6 +144,42 @@ export async function sendChatMessage(
       // ignore json parse error
     }
     throw new Error(`Chat error (${errorDetail})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch status of all configured AI providers.
+ */
+export async function getProviderStatus(): Promise<ProviderStatusResponse> {
+  const response = await fetch(`${BACKEND_URL}/api/providers/status`, {
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch provider status: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch comparative benchmark metrics between Gemini and OpenAI.
+ */
+export async function getProviderBenchmark(): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/providers/benchmark`, {
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to run benchmark: ${response.statusText}`);
   }
 
   return response.json();

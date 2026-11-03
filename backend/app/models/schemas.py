@@ -10,7 +10,7 @@ class HealthResponse(BaseModel):
 
     status: str = Field(default="healthy", description="Current health status")
     assistant: str = Field(default="Friday", description="Assistant name")
-    version: str = Field(default="0.2.0", description="Backend API version")
+    version: str = Field(default="0.3.5", description="Backend API version")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Current UTC timestamp",
@@ -26,14 +26,15 @@ class AssistantInfoResponse(BaseModel):
 
     name: str = "Mohib AI"
     assistant_name: str = "Friday"
-    version: str = "0.2.0"
+    version: str = "0.3.5"
     status: str = "online"
     features: List[str] = [
         "health-monitoring",
         "zero-cost-first-architecture",
         "bangla-english-ready",
         "permission-safe-design",
-        "ai-brain-chat",
+        "multi-provider-ai-router",
+        "gemini-and-openai-support",
     ]
 
 
@@ -60,6 +61,10 @@ class ChatRequest(BaseModel):
         default=None,
         description="Optional client conversation identifier",
     )
+    preferred_provider: Optional[str] = Field(
+        default=None,
+        description="Explicit provider override: 'auto', 'gemini', or 'openai'",
+    )
 
     @field_validator("message")
     @classmethod
@@ -74,7 +79,7 @@ class ChatResponse(BaseModel):
     """Response returned by POST /api/chat."""
 
     reply: str = Field(..., description="Assistant reply content")
-    provider: str = Field(..., description="Active AI provider (e.g. 'mock' or 'gemini')")
+    provider: str = Field(..., description="Active AI provider used (e.g. 'gemini', 'openai', 'mock')")
     model: str = Field(..., description="Model identifier used")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -84,3 +89,25 @@ class ChatResponse(BaseModel):
         default=None,
         description="Conversation identifier",
     )
+    routing_mode: Optional[str] = Field(
+        default="auto",
+        description="Routing mode used ('auto', 'gemini', 'openai', 'mock')",
+    )
+
+
+class ProviderInfo(BaseModel):
+    """Metadata for an individual provider."""
+
+    provider: str
+    configured: bool
+    model: str
+    status: str
+    tier: str
+    cost_estimate: str
+
+
+class ProviderStatusResponse(BaseModel):
+    """Status summary of all AI providers."""
+
+    active_mode: str
+    providers: Dict[str, ProviderInfo]

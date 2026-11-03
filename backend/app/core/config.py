@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Configuration settings for Mohib AI backend."""
 
     APP_NAME: str = "Mohib AI (Friday) Backend"
-    APP_VERSION: str = "0.2.1"
+    APP_VERSION: str = "0.3.5"
     ENVIRONMENT: str = "development"
     BACKEND_HOST: str = "127.0.0.1"
     BACKEND_PORT: int = 8000
@@ -16,10 +16,21 @@ class Settings(BaseSettings):
     # CORS origins allowed to communicate with this backend
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    # AI Brain & Provider Configuration
-    AI_PROVIDER: str = "mock"  # "mock" or "gemini"
+    # Multi-Provider AI Intelligence Configuration
+    # Options: "auto" (default intelligent routing), "gemini", "openai", "mock"
+    AI_PROVIDER: str = "auto"
+
+    # Google Gemini Settings
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    # OpenAI Settings
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
+    # Legacy alias support
     AI_MODEL_NAME: str = "gemini-1.5-flash"
+
     MAX_REQUEST_LENGTH: int = 4000
     MAX_HISTORY_MESSAGES: int = 20
 

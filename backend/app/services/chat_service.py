@@ -1,48 +1,48 @@
-"""Chat coordination service handling user messages and AI provider delegation."""
+"""Chat coordination service handling user messages and multi-provider AI routing."""
 
 import logging
 from app.models.schemas import ChatRequest, ChatResponse
-from app.services.ai.factory import get_ai_provider
+from app.services.ai.router import ai_router
 
 logger = logging.getLogger("mohib_ai.chat_service")
 
 
 class ChatService:
-    """Service orchestrating chat request validation, context handling, and generation."""
+    """Service orchestrating chat request validation, context handling, and router execution."""
 
     async def process_chat(self, request: ChatRequest) -> ChatResponse:
-        """Process incoming chat request dynamically resolving active AI provider."""
-        # Resolve provider dynamically per request so .env changes are detected instantly
-        provider = get_ai_provider()
-
+        """Process incoming chat request dynamically routing to Gemini, OpenAI, or Mock."""
         logger.info(
-            f"Processing chat request with provider [{provider.provider_name}]. "
+            f"Processing chat request. Mode: [{request.preferred_provider or 'auto'}], "
             f"Message length: {len(request.message)}, History turns: {len(request.history)}"
         )
 
         try:
-            # Delegate generation to provider
-            reply_text = await provider.generate_reply(
+            # Delegate generation to intelligent AIRouter
+            reply_text, provider_name, model_name = await ai_router.route_and_generate(
                 message=request.message,
                 history=request.history,
+                requested_mode=request.preferred_provider,
             )
 
             return ChatResponse(
                 reply=reply_text,
-                provider=provider.provider_name,
-                model=provider.model_name,
+                provider=provider_name,
+                model=model_name,
                 conversation_id=request.conversation_id,
+                routing_mode=request.preferred_provider or "auto",
             )
         except Exception as e:
-            logger.error(f"Error during AI generation: {str(e)}", exc_info=True)
+            logger.error(f"Error during AI routing & generation: {str(e)}", exc_info=True)
             return ChatResponse(
                 reply=(
                     "Friday encountered an unexpected error processing your request. "
                     "Please try again or check backend logs."
                 ),
-                provider=provider.provider_name,
-                model=provider.model_name,
+                provider="error",
+                model="none",
                 conversation_id=request.conversation_id,
+                routing_mode=request.preferred_provider or "auto",
             )
 
 

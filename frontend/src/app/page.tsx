@@ -21,13 +21,17 @@ import {
   Sliders,
   Radio,
   Globe2,
+  Cpu,
+  Zap,
 } from "lucide-react";
 import {
   ChatMessage,
   ChatResponse,
   HealthResponse,
+  ProviderStatusResponse,
   sendChatMessage,
   getBackendHealth,
+  getProviderStatus,
 } from "@/lib/api";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { useVoiceAssistant } from "@/lib/speech/useVoiceAssistant";
@@ -54,12 +58,38 @@ export default function FridayWorkspace() {
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState<boolean>(false);
   const [showVoiceOrb, setShowVoiceOrb] = useState<boolean>(false);
   const [wakeWordNotice, setWakeWordNotice] = useState<string | null>(null);
+  const [aiProviderMode, setAiProviderMode] = useState<"auto" | "gemini" | "openai">("auto");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatusResponse | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Initialize Voice Assistant Hook
   const voice = useVoiceAssistant();
+
+  // Initialize provider mode from localStorage
+  useEffect(() => {
+    try {
+      const savedMode = localStorage.getItem("friday_ai_provider") as
+        | "auto"
+        | "gemini"
+        | "openai";
+      if (savedMode && ["auto", "gemini", "openai"].includes(savedMode)) {
+        setAiProviderMode(savedMode);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSelectProviderMode = (mode: "auto" | "gemini" | "openai") => {
+    setAiProviderMode(mode);
+    try {
+      localStorage.setItem("friday_ai_provider", mode);
+    } catch {
+      // ignore
+    }
+  };
 
   // Initialize conversations from localStorage or default
   useEffect(() => {
@@ -94,13 +124,20 @@ export default function FridayWorkspace() {
     }
   }, [conversations]);
 
-  // Check backend health periodically
+  // Check backend health and providers status periodically
   const checkHealth = useCallback(async () => {
     try {
       const data = await getBackendHealth();
       setBackendHealth(data);
     } catch {
       setBackendHealth(null);
+    }
+
+    try {
+      const pStatus = await getProviderStatus();
+      setProviderStatus(pStatus);
+    } catch {
+      setProviderStatus(null);
     }
   }, []);
 
@@ -195,13 +232,17 @@ export default function FridayWorkspace() {
       const response: ChatResponse = await sendChatMessage(
         content,
         currentMessages,
-        activeId
+        activeId,
+        aiProviderMode
       );
 
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: response.reply,
         timestamp: response.timestamp || new Date().toISOString(),
+        provider: response.provider,
+        model: response.model,
+        routing_mode: response.routing_mode,
       };
 
       setConversations((prev) =>
@@ -440,6 +481,46 @@ export default function FridayWorkspace() {
 
           {/* Header Action Controls */}
           <div className="flex items-center gap-2">
+            {/* Quick AI Provider Switcher Pill in Header */}
+            <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+              <button
+                onClick={() => handleSelectProviderMode("auto")}
+                className={`px-2 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 ${
+                  aiProviderMode === "auto"
+                    ? "bg-cyan-600 text-white shadow-sm font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Intelligent Auto Router: Gemini + OpenAI"
+              >
+                <span>⚡</span>
+                <span>Auto</span>
+              </button>
+              <button
+                onClick={() => handleSelectProviderMode("gemini")}
+                className={`px-2 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 ${
+                  aiProviderMode === "gemini"
+                    ? "bg-cyan-600 text-white shadow-sm font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Gemini Mode: Always use Google Gemini"
+              >
+                <span>💎</span>
+                <span>Gemini</span>
+              </button>
+              <button
+                onClick={() => handleSelectProviderMode("openai")}
+                className={`px-2 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 ${
+                  aiProviderMode === "openai"
+                    ? "bg-cyan-600 text-white shadow-sm font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="OpenAI Mode: Always use OpenAI GPT"
+              >
+                <span>🟢</span>
+                <span>OpenAI</span>
+              </button>
+            </div>
+
             {/* Direct Language Switcher Pill in Header */}
             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
               <button
@@ -638,14 +719,27 @@ export default function FridayWorkspace() {
                           <MarkdownRenderer content={msg.content} />
                           {/* Message actions footer with Replay and Copy */}
                           <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                            <span className="font-mono text-[10px]">
-                              {msg.timestamp
-                                ? new Date(msg.timestamp).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : ""}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px]">
+                                {msg.timestamp
+                                  ? new Date(msg.timestamp).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : ""}
+                              </span>
+                              {msg.model && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800/90 text-cyan-300 border border-slate-700/80">
+                                  <Cpu className="w-2.5 h-2.5 text-cyan-400" />
+                                  <span>{msg.model}</span>
+                                  {msg.routing_mode && (
+                                    <span className="text-[9px] text-slate-400">
+                                      ({msg.routing_mode})
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-3">
                               {/* Replay Voice button */}
                               <button
@@ -837,6 +931,9 @@ export default function FridayWorkspace() {
         isSupportedSTT={voice.isSupportedSTT}
         isSupportedTTS={voice.isSupportedTTS}
         micPermission={voice.micPermission}
+        aiProviderMode={aiProviderMode}
+        onSelectProviderMode={handleSelectProviderMode}
+        providerStatus={providerStatus}
       />
 
       {/* Clear Confirmation Modal */}

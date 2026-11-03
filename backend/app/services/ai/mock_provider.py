@@ -36,6 +36,15 @@ class MockAIProvider(BaseAIProvider):
     def __init__(self, model_name: str = "friday-demo-v1"):
         super().__init__(provider_name="mock", model_name=model_name)
 
+    async def check_health(self) -> dict:
+        """Mock provider is always available locally without network credentials."""
+        return {
+            "status": "ready",
+            "model": self.model_name,
+            "available": True,
+            "note": "Offline zero-cost demo engine",
+        }
+
     async def generate_reply(
         self,
         message: str,
