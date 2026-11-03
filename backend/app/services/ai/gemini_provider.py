@@ -5,20 +5,24 @@ from typing import List, Dict, Any
 import httpx
 from app.services.ai.base import BaseAIProvider
 from app.models.schemas import ChatMessage
-from app.core.config import settings
+from app.core.config import get_fresh_settings
 
 logger = logging.getLogger("mohib_ai.gemini")
 
 
 class GeminiAIProvider(BaseAIProvider):
-    """Zero-cost cloud provider utilizing Google Gemini Generative Language API."""
+    """Production cloud provider utilizing Google Gemini Generative Language API."""
 
     def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
-        super().__init__(provider_name="gemini", model_name=model_name)
-        self.api_key = api_key
+        # Normalize model name
+        clean_model = model_name.strip()
+        if clean_model.startswith("models/"):
+            clean_model = clean_model.replace("models/", "")
+
+        super().__init__(provider_name="gemini", model_name=clean_model)
+        self.api_key = api_key.strip()
         self.endpoint_url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
-            f"?key={self.api_key}"
+            f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
         )
 
     async def generate_reply(
@@ -27,34 +31,57 @@ class GeminiAIProvider(BaseAIProvider):
         history: List[ChatMessage],
     ) -> str:
         """Send chat payload to Google Gemini and return the generated text."""
-        # Convert ChatMessage history to Gemini contents structure
-        contents: List[Dict[str, Any]] = []
+        current_settings = get_fresh_settings()
 
-        # Limit history to MAX_HISTORY_MESSAGES
-        trimmed_history = history[-settings.MAX_HISTORY_MESSAGES :]
+        # Build contents structure ensuring strictly alternating user/model turns
+        raw_turns: List[Dict[str, Any]] = []
+
+        # Trim history
+        trimmed_history = history[-current_settings.MAX_HISTORY_MESSAGES :]
 
         for msg in trimmed_history:
             role = "user" if msg.role == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg.content}],
-            })
+            content_text = msg.content.strip()
+            if not content_text:
+                continue
+
+            # If previous turn had the same role, combine to satisfy Gemini alternating constraint
+            if raw_turns and raw_turns[-1]["role"] == role:
+                raw_turns[-1]["parts"][0]["text"] += f"\n\n{content_text}"
+            else:
+                raw_turns.append({
+                    "role": role,
+                    "parts": [{"text": content_text}],
+                })
 
         # Append current user prompt
-        contents.append({
-            "role": "user",
-            "parts": [{"text": message}],
-        })
+        user_prompt = message.strip()
+        if raw_turns and raw_turns[-1]["role"] == "user":
+            raw_turns[-1]["parts"][0]["text"] += f"\n\n{user_prompt}"
+        else:
+            raw_turns.append({
+                "role": "user",
+                "parts": [{"text": user_prompt}],
+            })
+
+        # Ensure first turn is from 'user'
+        while raw_turns and raw_turns[0]["role"] != "user":
+            raw_turns.pop(0)
 
         payload = {
             "system_instruction": {
-                "parts": [{"text": settings.FRIDAY_SYSTEM_PROMPT}],
+                "parts": [{"text": current_settings.FRIDAY_SYSTEM_PROMPT}],
             },
-            "contents": contents,
+            "contents": raw_turns,
             "generationConfig": {
                 "temperature": 0.7,
                 "maxOutputTokens": 2048,
             },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key,
         }
 
         try:
@@ -62,7 +89,7 @@ class GeminiAIProvider(BaseAIProvider):
                 response = await client.post(
                     self.endpoint_url,
                     json=payload,
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                 )
 
                 if response.status_code == 200:
@@ -74,20 +101,40 @@ class GeminiAIProvider(BaseAIProvider):
                             return parts[0]["text"]
                     return "Friday received an empty response from Gemini."
 
-                # Error handling without leaking API key
-                error_body = response.text
-                logger.error(
-                    f"Gemini API returned status {response.status_code}: {error_body[:200]}"
-                )
-                return (
-                    f"**[Friday Gemini Error]**\n\n"
-                    f"Gemini API error (Status {response.status_code}). Please verify your `GEMINI_API_KEY`."
-                )
+                # Detailed error diagnostics without leaking key
+                status_code = response.status_code
+                error_json = {}
+                try:
+                    error_json = response.json().get("error", {})
+                except Exception:
+                    pass
+
+                error_message = error_json.get("message", response.text[:200])
+
+                if status_code in (401, 403):
+                    logger.error(f"Gemini authentication failed: {error_message}")
+                    return (
+                        "⚠️ **[Friday Gemini Authentication Error]**\n\n"
+                        "আপনার `GEMINI_API_KEY` টি সঠিক নয় বা মেয়াদোত্তীর্ণ হয়েছে।\n"
+                        "দয়া করে [Google AI Studio](https://aistudio.google.com/) থেকে একটি সঠিক ও ফ্রি API Key সংগ্রহ করে "
+                        "আপনার `.env` ফাইলে আপডেট করুন।"
+                    )
+                elif status_code == 429:
+                    logger.warning(f"Gemini quota/rate limit: {error_message}")
+                    return (
+                        "⏳ **[Friday Gemini Rate Limit]**\n\n"
+                        "Gemini API-এর রিকোয়েস্ট কোটা পূর্ণ হয়েছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"
+                    )
+                else:
+                    logger.error(f"Gemini API error ({status_code}): {error_message}")
+                    return (
+                        f"⚠️ **[Friday Gemini Error - Status {status_code}]**\n\n"
+                        f"{error_message}"
+                    )
 
         except httpx.TimeoutException:
             logger.error("Gemini API request timed out.")
             return "Friday request to Gemini timed out. Please check your internet connection and try again."
         except Exception as e:
-            logger.error(f"Unexpected error communicating with Gemini API: {str(e)}")
+            logger.error(f"Unexpected error communicating with Gemini API: {str(e)}", exc_info=True)
             return f"Friday encountered an unexpected error while contacting Gemini API: {str(e)}"
-

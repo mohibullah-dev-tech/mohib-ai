@@ -1,14 +1,14 @@
 /**
  * Browser-native Web Speech API Recognition Service.
- * Provides zero-cost speech-to-text with bilingual support (Bangla & English).
+ * Provides accurate, explicit language speech-to-text with bilingual support (Bangla & English).
  */
 
-export type SpeechLang = "auto" | "bn-BD" | "en-US";
+export type SupportedSpeechLang = "bn-BD" | "en-US";
 
 export interface SpeechRecognitionResultPayload {
-  transcript: string;
-  isFinal: boolean;
-  detectedLang?: string;
+  interimTranscript: string;
+  finalTranscript: string;
+  lang: SupportedSpeechLang;
 }
 
 // Window declaration for cross-browser speech recognition support
@@ -21,14 +21,20 @@ export class SpeechRecognitionService {
   private recognition: any = null;
   private isListening: boolean = false;
   private isWakeWordMode: boolean = false;
-  private selectedLang: SpeechLang = "auto";
-  private onResultCallback?: (result: SpeechRecognitionResultPayload) => void;
+  private selectedLang: SupportedSpeechLang = "bn-BD"; // Default to Bangla as primary requested
+
+  // Callbacks
+  private onInterimCallback?: (text: string) => void;
+  private onFinalCallback?: (text: string) => void;
   private onErrorCallback?: (error: string) => void;
   private onEndCallback?: () => void;
   private onWakeWordCallback?: () => void;
 
+  // Session state to prevent duplicate emission
+  private accumulatedFinalTranscript: string = "";
+  private currentInterimTranscript: string = "";
+
   constructor() {
-    // Check browser support
     if (typeof window !== "undefined") {
       const win = window as unknown as IWindow;
       const SpeechRecognitionAPI =
@@ -36,7 +42,7 @@ export class SpeechRecognitionService {
 
       if (SpeechRecognitionAPI) {
         this.recognition = new SpeechRecognitionAPI();
-        this.recognition.continuous = false;
+        this.recognition.continuous = false; // standard turn-based recognition
         this.recognition.interimResults = true;
         this.recognition.maxAlternatives = 1;
         this.setupListeners();
@@ -53,28 +59,35 @@ export class SpeechRecognitionService {
   private setupListeners() {
     if (!this.recognition) return;
 
+    this.recognition.onstart = () => {
+      this.isListening = true;
+      this.accumulatedFinalTranscript = "";
+      this.currentInterimTranscript = "";
+    };
+
     this.recognition.onresult = (event: any) => {
-      let interimTranscript = "";
-      let finalTranscript = "";
+      let interim = "";
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const item = event.results[i];
+        const transcriptText = item[0]?.transcript || "";
+
         if (item.isFinal) {
-          finalTranscript += item[0].transcript;
+          this.accumulatedFinalTranscript += (this.accumulatedFinalTranscript ? " " : "") + transcriptText.trim();
         } else {
-          interimTranscript += item[0].transcript;
+          interim += transcriptText;
         }
       }
 
-      const activeText = finalTranscript || interimTranscript;
+      this.currentInterimTranscript = interim;
 
       // Experimental Wake Word detection
-      if (this.isWakeWordMode && activeText) {
-        const lower = activeText.toLowerCase();
+      const fullCurrentText = (this.accumulatedFinalTranscript + " " + interim).trim().toLowerCase();
+      if (this.isWakeWordMode && fullCurrentText) {
         if (
-          lower.includes("friday") ||
-          lower.includes("hey friday") ||
-          activeText.includes("ফ্রাইডে")
+          fullCurrentText.includes("friday") ||
+          fullCurrentText.includes("hey friday") ||
+          fullCurrentText.includes("ফ্রাইডে")
         ) {
           if (this.onWakeWordCallback) {
             this.onWakeWordCallback();
@@ -83,24 +96,24 @@ export class SpeechRecognitionService {
         }
       }
 
-      if (this.onResultCallback && activeText) {
-        this.onResultCallback({
-          transcript: activeText,
-          isFinal: Boolean(finalTranscript),
-        });
+      // Send live interim text to UI for real-time visualization
+      if (this.onInterimCallback) {
+        this.onInterimCallback(interim || this.accumulatedFinalTranscript);
       }
     };
 
     this.recognition.onerror = (event: any) => {
       let msg = "Microphone error occurred.";
       if (event.error === "not-allowed") {
-        msg = "Microphone permission was denied. Please allow microphone access in your browser.";
+        msg = "মাইক্রোফোন পারমিশন দেওয়া হয়নি। দয়া করে ব্রাউজারের সাইট সেটিংসে মাইক্রোফোন Allow করুন।";
       } else if (event.error === "no-speech") {
-        msg = "No speech was detected. Please try speaking again.";
+        msg = "কোনো কথা শোনা যায়নি। দয়া করে আবার স্পষ্ট করে বলুন।";
       } else if (event.error === "network") {
-        msg = "Network error during speech recognition. Ensure your connection is active.";
+        msg = "নেটওয়ার্ক ত্রুটি। ব্রাউজারের স্পিচ সার্ভিস ইন্টারনেটে সংযোগ পেতে ব্যর্থ হয়েছে।";
       } else if (event.error === "audio-capture") {
-        msg = "No microphone was found or microphone is busy.";
+        msg = "মাইক্রোফোন ডিভাইস পাওয়া যায়নি বা অন্য অ্যাপ ব্যবহার করছে।";
+      } else if (event.error === "language-not-supported") {
+        msg = `নির্বাচিত ভাষা (${this.selectedLang}) এই ব্রাউজারে সমর্থিত নয়। Google Chrome বা Microsoft Edge ব্যবহার করুন।`;
       }
       if (this.onErrorCallback) {
         this.onErrorCallback(msg);
@@ -109,7 +122,14 @@ export class SpeechRecognitionService {
 
     this.recognition.onend = () => {
       this.isListening = false;
-      // If in wake-word mode and still enabled, restart recognition safely
+
+      // Deliver final accumulated transcript once
+      const finalResult = this.accumulatedFinalTranscript.trim() || this.currentInterimTranscript.trim();
+      if (finalResult && this.onFinalCallback && !this.isWakeWordMode) {
+        this.onFinalCallback(finalResult);
+      }
+
+      // Wake word auto-restart if enabled
       if (this.isWakeWordMode) {
         try {
           this.recognition.start();
@@ -119,52 +139,61 @@ export class SpeechRecognitionService {
           // ignore restart errors
         }
       }
+
       if (this.onEndCallback) {
         this.onEndCallback();
       }
     };
   }
 
-  public setLanguage(lang: SpeechLang) {
+  /**
+   * Explicitly set the recognition language: bn-BD or en-US.
+   * Never forces en-US when bn-BD is selected.
+   */
+  public setLanguage(lang: SupportedSpeechLang) {
     this.selectedLang = lang;
     if (this.recognition) {
-      if (lang === "bn-BD") {
-        this.recognition.lang = "bn-BD";
-      } else if (lang === "en-US") {
-        this.recognition.lang = "en-US";
-      } else {
-        // Auto default to English, will adapt based on input
-        this.recognition.lang = "en-US";
-      }
+      this.recognition.lang = lang;
     }
   }
 
+  public getSelectedLanguage(): SupportedSpeechLang {
+    return this.selectedLang;
+  }
+
   public startListening(
-    onResult: (result: SpeechRecognitionResultPayload) => void,
+    onInterim: (text: string) => void,
+    onFinal: (text: string) => void,
     onError: (error: string) => void,
     onEnd: () => void,
     wakeWordMode: boolean = false,
     onWakeWord?: () => void
   ) {
     if (!this.recognition) {
-      onError("Speech Recognition is not supported by your current browser. Try Google Chrome or Microsoft Edge.");
+      onError(
+        "Web Speech API এই ব্রাউজারে সমর্থিত নয়। বাংলা ভয়েস ইনপুটের জন্য Google Chrome বা Microsoft Edge ব্রাউজার ব্যবহার করুন।"
+      );
       return;
     }
 
-    this.onResultCallback = onResult;
+    this.onInterimCallback = onInterim;
+    this.onFinalCallback = onFinal;
     this.onErrorCallback = onError;
     this.onEndCallback = onEnd;
     this.isWakeWordMode = wakeWordMode;
     this.onWakeWordCallback = onWakeWord;
 
-    this.setLanguage(this.selectedLang);
+    // Apply strict chosen language directly to recognition instance
+    this.recognition.lang = this.selectedLang;
 
     try {
+      this.accumulatedFinalTranscript = "";
+      this.currentInterimTranscript = "";
       this.recognition.start();
       this.isListening = true;
     } catch (e: any) {
       if (e.name !== "InvalidStateError") {
-        onError(`Could not start recognition: ${e.message || e}`);
+        onError(`স্পিচ রিকগনিশন শুরু করা যায়নি: ${e.message || e}`);
       }
     }
   }

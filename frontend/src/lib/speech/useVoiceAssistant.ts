@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   SpeechRecognitionService,
-  SpeechLang,
-  SpeechRecognitionResultPayload,
+  SupportedSpeechLang,
 } from "./speechRecognition";
 import {
   SpeechSynthesisService,
@@ -25,27 +24,42 @@ export function useVoiceAssistant() {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [isWakeWordActive, setIsWakeWordActive] = useState<boolean>(false);
   const [voiceState, setVoiceState] = useState<AssistantVoiceState>("idle");
-  const [liveTranscript, setLiveTranscript] = useState<string>("");
+  const [liveHearing, setLiveHearing] = useState<string>("");
+  const [finalTranscript, setFinalTranscript] = useState<string>("");
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
   // Settings
   const [selectedVoice, setSelectedVoice] = useState<VoiceOptionId>("voice-1");
   const [speechSpeed, setSpeechSpeed] = useState<number>(1.0);
-  const [speechLang, setSpeechLang] = useState<SpeechLang>("auto");
+  const [speechLang, setSpeechLangState] = useState<SupportedSpeechLang>("bn-BD");
   const [autoSpeak, setAutoSpeak] = useState<boolean>(true);
   const [hasBanglaVoice, setHasBanglaVoice] = useState<boolean>(false);
   const [micPermission, setMicPermission] = useState<string>("prompt");
 
   const sttServiceRef = useRef<SpeechRecognitionService | null>(null);
   const ttsServiceRef = useRef<SpeechSynthesisService | null>(null);
+  const isSpeakingLock = useRef<boolean>(false);
 
-  // Initialize services on client
+  // Initialize services and saved language on client
   useEffect(() => {
     sttServiceRef.current = new SpeechRecognitionService();
     ttsServiceRef.current = new SpeechSynthesisService();
 
     setIsSupportedSTT(SpeechRecognitionService.isSupported());
     setIsSupportedTTS(SpeechSynthesisService.isSupported());
+
+    // Restore saved language preference from localStorage (default: bn-BD)
+    try {
+      const savedLang = localStorage.getItem("friday_speech_lang") as SupportedSpeechLang;
+      if (savedLang === "bn-BD" || savedLang === "en-US") {
+        setSpeechLangState(savedLang);
+        sttServiceRef.current?.setLanguage(savedLang);
+      } else {
+        sttServiceRef.current?.setLanguage("bn-BD");
+      }
+    } catch {
+      sttServiceRef.current?.setLanguage("bn-BD");
+    }
 
     if (ttsServiceRef.current) {
       setHasBanglaVoice(ttsServiceRef.current.hasBanglaVoice());
@@ -56,8 +70,8 @@ export function useVoiceAssistant() {
       });
     }
 
-    // Check mic permission if supported
-    if (navigator.permissions && navigator.permissions.query) {
+    // Check mic permission status
+    if (typeof navigator !== "undefined" && navigator.permissions && navigator.permissions.query) {
       navigator.permissions
         .query({ name: "microphone" as PermissionName })
         .then((permissionStatus) => {
@@ -77,39 +91,54 @@ export function useVoiceAssistant() {
     };
   }, []);
 
-  // Update STT language when changed
-  useEffect(() => {
-    sttServiceRef.current?.setLanguage(speechLang);
-  }, [speechLang]);
+  // Set language with persistence
+  const setSpeechLang = useCallback((lang: SupportedSpeechLang) => {
+    setSpeechLangState(lang);
+    sttServiceRef.current?.setLanguage(lang);
+    try {
+      localStorage.setItem("friday_speech_lang", lang);
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  // Stop speaking
+  const stopSpeaking = useCallback(() => {
+    isSpeakingLock.current = false;
+    ttsServiceRef.current?.stop();
+    setIsSpeaking(false);
+    setVoiceState((prev) => (prev === "speaking" ? "idle" : prev));
+  }, []);
 
   // Start listening
   const startListening = useCallback(
-    (onFinalTranscript?: (text: string) => void) => {
+    (onFinalResult?: (text: string) => void) => {
       if (!sttServiceRef.current) return;
 
-      // Stop speech if speaking when user starts talking
-      if (ttsServiceRef.current?.getIsSpeaking()) {
-        ttsServiceRef.current.stop();
-        setIsSpeaking(false);
-      }
+      // Stop speech immediately when listening begins
+      stopSpeaking();
 
       setVoiceError(null);
-      setLiveTranscript("");
+      setLiveHearing("");
       setVoiceState("listening");
       setIsListening(true);
 
       sttServiceRef.current.startListening(
-        (result: SpeechRecognitionResultPayload) => {
-          setLiveTranscript(result.transcript);
-          if (result.isFinal && onFinalTranscript) {
-            onFinalTranscript(result.transcript);
-            setLiveTranscript("");
+        (interimText: string) => {
+          setLiveHearing(interimText);
+        },
+        (finalText: string) => {
+          setFinalTranscript(finalText);
+          setLiveHearing("");
+          if (onFinalResult) {
+            onFinalResult(finalText);
           }
         },
         (error: string) => {
           setVoiceError(error);
           setVoiceState("error");
           setIsListening(false);
+          setLiveHearing("");
         },
         () => {
           setIsListening(false);
@@ -118,23 +147,24 @@ export function useVoiceAssistant() {
         false
       );
     },
-    []
+    [stopSpeaking]
   );
 
   // Stop listening
   const stopListening = useCallback(() => {
     sttServiceRef.current?.stopListening();
     setIsListening(false);
+    setLiveHearing("");
     setVoiceState((prev) => (prev === "listening" ? "idle" : prev));
   }, []);
 
   // Toggle listening
   const toggleListening = useCallback(
-    (onFinalTranscript?: (text: string) => void) => {
+    (onFinalResult?: (text: string) => void) => {
       if (isListening) {
         stopListening();
       } else {
-        startListening(onFinalTranscript);
+        startListening(onFinalResult);
       }
     },
     [isListening, startListening, stopListening]
@@ -158,6 +188,7 @@ export function useVoiceAssistant() {
 
         sttServiceRef.current.startListening(
           () => {},
+          () => {},
           (err) => {
             setVoiceError(err);
             setIsWakeWordActive(false);
@@ -167,7 +198,6 @@ export function useVoiceAssistant() {
           () => {},
           true, // wakeWordMode
           () => {
-            // Wake word detected!
             onWakeWordDetected();
           }
         );
@@ -176,10 +206,14 @@ export function useVoiceAssistant() {
     [isWakeWordActive]
   );
 
-  // Speak AI response
+  // Speak AI response with single-execution guard
   const speak = useCallback(
     (text: string) => {
       if (!ttsServiceRef.current || !autoSpeak) return;
+
+      // Prevent concurrent duplicate speech triggers
+      ttsServiceRef.current.stop();
+      isSpeakingLock.current = true;
 
       setVoiceState("speaking");
       setIsSpeaking(true);
@@ -193,10 +227,12 @@ export function useVoiceAssistant() {
           setVoiceState("speaking");
         },
         () => {
+          isSpeakingLock.current = false;
           setIsSpeaking(false);
           setVoiceState("idle");
         },
         (err) => {
+          isSpeakingLock.current = false;
           setVoiceError(err);
           setIsSpeaking(false);
           setVoiceState("idle");
@@ -206,10 +242,13 @@ export function useVoiceAssistant() {
     [selectedVoice, speechSpeed, autoSpeak]
   );
 
-  // Force speak regardless of autoSpeak setting (for Replay button)
+  // Force speak (for Replay button)
   const forceSpeak = useCallback(
     (text: string) => {
       if (!ttsServiceRef.current) return;
+
+      ttsServiceRef.current.stop();
+      isSpeakingLock.current = true;
 
       setVoiceState("speaking");
       setIsSpeaking(true);
@@ -223,10 +262,12 @@ export function useVoiceAssistant() {
           setVoiceState("speaking");
         },
         () => {
+          isSpeakingLock.current = false;
           setIsSpeaking(false);
           setVoiceState("idle");
         },
         (err) => {
+          isSpeakingLock.current = false;
           setVoiceError(err);
           setIsSpeaking(false);
           setVoiceState("idle");
@@ -236,13 +277,6 @@ export function useVoiceAssistant() {
     [selectedVoice, speechSpeed]
   );
 
-  // Stop speaking
-  const stopSpeaking = useCallback(() => {
-    ttsServiceRef.current?.stop();
-    setIsSpeaking(false);
-    setVoiceState((prev) => (prev === "speaking" ? "idle" : prev));
-  }, []);
-
   return {
     isSupportedSTT,
     isSupportedTTS,
@@ -251,7 +285,8 @@ export function useVoiceAssistant() {
     isWakeWordActive,
     voiceState,
     setVoiceState,
-    liveTranscript,
+    liveHearing,
+    finalTranscript,
     voiceError,
     setVoiceError,
     selectedVoice,

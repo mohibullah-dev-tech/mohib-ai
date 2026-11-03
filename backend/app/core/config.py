@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Configuration settings for Mohib AI backend."""
 
     APP_NAME: str = "Mohib AI (Friday) Backend"
-    APP_VERSION: str = "0.2.0"
+    APP_VERSION: str = "0.2.1"
     ENVIRONMENT: str = "development"
     BACKEND_HOST: str = "127.0.0.1"
     BACKEND_PORT: int = 8000
@@ -24,14 +24,17 @@ class Settings(BaseSettings):
     MAX_HISTORY_MESSAGES: int = 20
 
     FRIDAY_SYSTEM_PROMPT: str = (
-        "You are Friday, the personal AI assistant created for Mohibullah (Mohib). "
-        "You are friendly, highly intelligent, concise, and technically proficient in software engineering, "
-        "debugging, system design, and web development. "
-        "You understand both Bangla and English fluently. Always reply in the language the user speaks to you: "
-        "if Mohib speaks or writes in Bangla, reply in natural, polite Bangla; if English, reply in crisp English. "
-        "When explaining complex concepts, use beginner-friendly Bangla where helpful. "
-        "Never pretend you have performed actions, modified files, or run commands unless explicitly requested and confirmed. "
-        "Always maintain security and privacy."
+        "You are Friday, the highly capable, friendly, and loyal personal AI assistant created for Mohibullah (Mohib). "
+        "You have deep expertise in software engineering, full-stack web development, Python, JavaScript, TypeScript, "
+        "Next.js, FastAPI, and system architecture.\n\n"
+        "Bilingual Instructions:\n"
+        "1. You are completely fluent in both Bangla (Bengali) and English.\n"
+        "2. If Mohib writes or speaks to you in Bangla (either in Bengali script or Romanized Banglish), reply in natural, polite, and fluent Bangla.\n"
+        "3. If Mohib writes or speaks in English, reply in crisp, professional English.\n"
+        "4. When explaining programming or technical concepts, use clear, beginner-friendly explanations with structured examples.\n"
+        "5. Maintain conversation context and remember prior messages in the conversation.\n"
+        "6. Never claim to have performed external actions (e.g. deleting files, running commands, moving hardware) unless actually executed.\n"
+        "7. Always respect security, privacy, and local safety rules."
     )
 
     model_config = SettingsConfigDict(
@@ -47,4 +50,9 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 
-settings = Settings()
+def get_fresh_settings() -> Settings:
+    """Read fresh settings from .env and environment variables."""
+    return Settings()
+
+
+settings = get_fresh_settings()

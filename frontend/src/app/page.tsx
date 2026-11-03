@@ -16,11 +16,11 @@ import {
   ShieldCheck,
   AlertCircle,
   Mic,
-  MicOff,
   Volume2,
   VolumeX,
   Sliders,
   Radio,
+  Globe2,
 } from "lucide-react";
 import {
   ChatMessage,
@@ -117,7 +117,7 @@ export default function FridayWorkspace() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [conversations, loading, voice.liveTranscript]);
+  }, [conversations, loading, voice.liveHearing]);
 
   const activeConversation =
     conversations.find((c) => c.id === activeId) || conversations[0];
@@ -162,7 +162,7 @@ export default function FridayWorkspace() {
     setError(null);
     setInput("");
 
-    // Stop speaking any previous message
+    // Stop speaking any previous message to prevent double speech
     voice.stopSpeaking();
 
     // Auto-adjust title if first message
@@ -216,7 +216,7 @@ export default function FridayWorkspace() {
         )
       );
 
-      // Speak response out loud using TTS
+      // Speak response out loud using TTS (single trigger)
       voice.speak(response.reply);
     } catch (err: unknown) {
       const errorMsg =
@@ -228,23 +228,26 @@ export default function FridayWorkspace() {
     }
   };
 
-  // Handle Speech Recognition finish -> place in input field so user can edit before sending
+  // When speech recognition produces final text: put it into input for user editing
   const handleSpeechResult = (transcript: string) => {
-    setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    if (!transcript.trim()) return;
+    setInput((prev) => {
+      const cleanedPrev = prev.trim();
+      return cleanedPrev ? `${cleanedPrev} ${transcript.trim()}` : transcript.trim();
+    });
     textareaRef.current?.focus();
   };
 
-  // Mic Button handler
+  // Mic Button toggle handler
   const handleMicToggle = () => {
     voice.toggleListening(handleSpeechResult);
   };
 
   // Wake word activation callback
   const handleWakeWordDetected = () => {
-    setWakeWordNotice("Wake Word Detected: Friday is listening...");
+    setWakeWordNotice("Wake Word Detected ('Friday'): Listening for your voice...");
     setShowVoiceOrb(true);
-    setTimeout(() => setWakeWordNotice(null), 3000);
-    // Start listening for prompt
+    setTimeout(() => setWakeWordNotice(null), 3500);
     voice.startListening(handleSpeechResult);
   };
 
@@ -437,6 +440,34 @@ export default function FridayWorkspace() {
 
           {/* Header Action Controls */}
           <div className="flex items-center gap-2">
+            {/* Direct Language Switcher Pill in Header */}
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+              <button
+                onClick={() => voice.setSpeechLang("bn-BD")}
+                className={`px-2.5 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 ${
+                  voice.speechLang === "bn-BD"
+                    ? "bg-cyan-600 text-white shadow-sm font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="বাংলা ভাষায় ভয়েস ইনপুট সক্রিয় করুন"
+              >
+                <span>🇧🇩</span>
+                <span>বাংলা</span>
+              </button>
+              <button
+                onClick={() => voice.setSpeechLang("en-US")}
+                className={`px-2.5 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 ${
+                  voice.speechLang === "en-US"
+                    ? "bg-cyan-600 text-white shadow-sm font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Switch voice input to English (US)"
+              >
+                <span>🇺🇸</span>
+                <span>EN</span>
+              </button>
+            </div>
+
             {/* Global Stop Speaking Button (when active) */}
             {voice.isSpeaking && (
               <button
@@ -445,7 +476,7 @@ export default function FridayWorkspace() {
                 title="Stop Speaking"
               >
                 <VolumeX className="w-3.5 h-3.5" />
-                <span>Stop Speaking</span>
+                <span>Stop</span>
               </button>
             )}
 
@@ -456,7 +487,7 @@ export default function FridayWorkspace() {
               title="Voice Settings"
             >
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">Voice Settings</span>
+              <span className="hidden sm:inline">Settings</span>
             </button>
           </div>
         </header>
@@ -475,12 +506,20 @@ export default function FridayWorkspace() {
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               {voice.voiceError}
             </span>
-            <button
-              onClick={() => voice.setVoiceError(null)}
-              className="text-xs underline text-rose-300"
-            >
-              Dismiss
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMicToggle}
+                className="px-2 py-0.5 rounded bg-rose-900 text-xs font-medium text-rose-100 hover:bg-rose-800"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => voice.setVoiceError(null)}
+                className="text-xs underline text-rose-300"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -491,8 +530,9 @@ export default function FridayWorkspace() {
               state={voice.voiceState}
               isListening={voice.isListening}
               isSpeaking={voice.isSpeaking}
-              liveTranscript={voice.liveTranscript}
+              liveHearing={voice.liveHearing}
               isWakeWordActive={voice.isWakeWordActive}
+              speechLang={voice.speechLang}
               onMicClick={handleMicToggle}
               onStopSpeaking={voice.stopSpeaking}
               onOpenSettings={() => setVoiceSettingsOpen(true)}
@@ -509,8 +549,9 @@ export default function FridayWorkspace() {
                 state={voice.voiceState}
                 isListening={voice.isListening}
                 isSpeaking={voice.isSpeaking}
-                liveTranscript={voice.liveTranscript}
+                liveHearing={voice.liveHearing}
                 isWakeWordActive={voice.isWakeWordActive}
+                speechLang={voice.speechLang}
                 onMicClick={handleMicToggle}
                 onStopSpeaking={voice.stopSpeaking}
                 onOpenSettings={() => setVoiceSettingsOpen(true)}
@@ -520,31 +561,31 @@ export default function FridayWorkspace() {
                 Hello Mohib, Friday is ready to listen.
               </h2>
               <p className="text-sm text-slate-400 mt-1 mb-6">
-                মাইক্রোফোনে ক্লিক করে কথা বলুন, অথবা টেক্সট লিখে যেকোনো কিছু জিজ্ঞাসা করুন।
+                মাইক্রোফোনে ক্লিক করে বাংলায় কথা বলুন, অথবা টেক্সট বক্সে টাইপ করে যেকোনো কিছু জিজ্ঞাসা করুন।
               </p>
 
-              {/* Starter Suggestions */}
+              {/* Starter Suggestions for Phase 4 Test Scenarios */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left">
                 {[
                   {
-                    title: "তুমি কি কি করতে পারো?",
-                    desc: "বাংলায় ফ্রাইডের ক্ষমতা জানুন",
-                    prompt: "তুমি কি কি করতে পারো?",
+                    title: "তুমি কি আমাকে চিনতে পারো?",
+                    desc: "আইডেন্টিটি ও রিকগনিশন টেস্ট",
+                    prompt: "তুমি কি আমাকে চিনতে পারো?",
                   },
                   {
-                    title: "Who are you?",
-                    desc: "Learn about Friday's personality",
-                    prompt: "Who are you and how can you help me?",
+                    title: "আজকে আমাকে JavaScript শেখাও।",
+                    desc: "কোডিং টিউটোরিয়াল টেস্ট",
+                    prompt: "আজকে আমাকে JavaScript শেখাও।",
                   },
                   {
-                    title: "Test Voice Synthesis",
-                    desc: "Hear Friday respond with voice",
-                    prompt: "Tell me a short motivational quote about programming.",
+                    title: "আমি একটা ওয়েবসাইট তৈরি করতে চাই।",
+                    desc: "ওয়েব ডেভেলপমেন্ট রোডম্যাপ",
+                    prompt: "আমি একটা ওয়েবসাইট তৈরি করতে চাই।",
                   },
                   {
-                    title: "Web Development Stack",
-                    desc: "Explain our FastAPI & Next.js setup",
-                    prompt: "Explain how our FastAPI and Next.js projects work together.",
+                    title: "Frontend vs Backend",
+                    desc: "Technical difference test",
+                    prompt: "What is the difference between frontend and backend?",
                   },
                 ].map((item, idx) => (
                   <button
@@ -687,11 +728,25 @@ export default function FridayWorkspace() {
         {/* Input Bar with Speech Microphone integration */}
         <div className="p-4 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-md">
           <div className="max-w-3xl mx-auto space-y-2">
-            {/* Live interim transcript preview above input if listening */}
-            {voice.isListening && voice.liveTranscript && (
-              <div className="px-3 py-1.5 rounded-lg bg-cyan-950/70 border border-cyan-800 text-cyan-300 text-xs flex items-center gap-2 animate-fadeIn">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
-                <span className="italic">"{voice.liveTranscript}"</span>
+            {/* Live hearing indicator banner above input while mic is active */}
+            {voice.isListening && (
+              <div className="px-3.5 py-2 rounded-xl bg-cyan-950/90 border border-cyan-600/80 text-cyan-200 text-xs flex items-center justify-between animate-fadeIn shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
+                  <span className="font-semibold text-emerald-300">
+                    {voice.speechLang === "bn-BD" ? "শুনছি (বাংলা):" : "Hearing (English):"}
+                  </span>
+                  <span className="italic font-medium">
+                    {voice.liveHearing || "কথা বলুন..."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMicToggle}
+                  className="px-2 py-0.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 text-[11px] border border-rose-800 transition"
+                >
+                  Stop
+                </button>
               </div>
             )}
 
@@ -701,7 +756,11 @@ export default function FridayWorkspace() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask Friday in Bangla or English... (Enter to send, or click Mic to speak)"
+                placeholder={
+                  voice.speechLang === "bn-BD"
+                    ? "বাংলায় প্রশ্ন লিখুন বা মাইকে বলুন... (Enter চাপলে সেন্ড হবে)"
+                    : "Ask Friday in English... (Enter to send, Shift+Enter for newline)"
+                }
                 rows={1}
                 className="w-full resize-none bg-transparent px-4 py-3.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none max-h-36 overflow-y-auto"
                 style={{ minHeight: "52px" }}
@@ -720,7 +779,7 @@ export default function FridayWorkspace() {
                   title={
                     voice.isListening
                       ? "Listening... Click to stop"
-                      : "Click to speak (Bangla / English)"
+                      : `Click to speak in ${voice.speechLang === "bn-BD" ? "Bangla (bn-BD)" : "English (en-US)"}`
                   }
                 >
                   {voice.isListening ? (
@@ -745,7 +804,9 @@ export default function FridayWorkspace() {
 
             <div className="flex justify-between items-center text-[10px] text-slate-400 px-2">
               <span className="flex items-center gap-2">
-                <span>Friday Voice Assistant • Web Speech API</span>
+                <span>
+                  Language: <strong className="text-cyan-400">{voice.speechLang === "bn-BD" ? "বাংলা (bn-BD)" : "English (en-US)"}</strong>
+                </span>
                 {voice.isWakeWordActive && (
                   <span className="text-emerald-400 font-medium">
                     ● Wake Word Active

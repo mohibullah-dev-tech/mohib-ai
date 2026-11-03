@@ -10,27 +10,27 @@ logger = logging.getLogger("mohib_ai.chat_service")
 class ChatService:
     """Service orchestrating chat request validation, context handling, and generation."""
 
-    def __init__(self):
-        self.provider = get_ai_provider()
-
     async def process_chat(self, request: ChatRequest) -> ChatResponse:
-        """Process incoming chat request and return formatted ChatResponse."""
+        """Process incoming chat request dynamically resolving active AI provider."""
+        # Resolve provider dynamically per request so .env changes are detected instantly
+        provider = get_ai_provider()
+
         logger.info(
-            f"Processing chat request. Message length: {len(request.message)}, "
-            f"History turns: {len(request.history)}"
+            f"Processing chat request with provider [{provider.provider_name}]. "
+            f"Message length: {len(request.message)}, History turns: {len(request.history)}"
         )
 
         try:
             # Delegate generation to provider
-            reply_text = await self.provider.generate_reply(
+            reply_text = await provider.generate_reply(
                 message=request.message,
                 history=request.history,
             )
 
             return ChatResponse(
                 reply=reply_text,
-                provider=self.provider.provider_name,
-                model=self.provider.model_name,
+                provider=provider.provider_name,
+                model=provider.model_name,
                 conversation_id=request.conversation_id,
             )
         except Exception as e:
@@ -40,11 +40,10 @@ class ChatService:
                     "Friday encountered an unexpected error processing your request. "
                     "Please try again or check backend logs."
                 ),
-                provider=self.provider.provider_name,
-                model=self.provider.model_name,
+                provider=provider.provider_name,
+                model=provider.model_name,
                 conversation_id=request.conversation_id,
             )
 
 
 chat_service = ChatService()
-

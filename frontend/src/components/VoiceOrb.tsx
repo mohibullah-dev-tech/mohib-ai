@@ -1,15 +1,17 @@
 "use client";
 
 import React from "react";
-import { Mic, MicOff, Volume2, VolumeX, Sparkles, AlertTriangle } from "lucide-react";
+import { Mic, Volume2, VolumeX } from "lucide-react";
 import { AssistantVoiceState } from "@/lib/speech/useVoiceAssistant";
+import { SupportedSpeechLang } from "@/lib/speech/speechRecognition";
 
 interface VoiceOrbProps {
   state: AssistantVoiceState;
   isListening: boolean;
   isSpeaking: boolean;
-  liveTranscript: string;
+  liveHearing: string;
   isWakeWordActive: boolean;
+  speechLang: SupportedSpeechLang;
   onMicClick: () => void;
   onStopSpeaking: () => void;
   onOpenSettings: () => void;
@@ -19,8 +21,9 @@ export function VoiceOrb({
   state,
   isListening,
   isSpeaking,
-  liveTranscript,
+  liveHearing,
   isWakeWordActive,
+  speechLang,
   onMicClick,
   onStopSpeaking,
   onOpenSettings,
@@ -32,14 +35,14 @@ export function VoiceOrb({
         return {
           glow: "bg-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.5)] border-emerald-400",
           core: "bg-gradient-to-tr from-emerald-500 to-teal-400 animate-pulse",
-          label: "Listening...",
+          label: speechLang === "bn-BD" ? "শুনছি... (বাংলা)" : "Listening... (English)",
           badgeColor: "bg-emerald-950 text-emerald-400 border-emerald-800",
         };
       case "thinking":
         return {
           glow: "bg-cyan-500/20 shadow-[0_0_50px_rgba(6,182,212,0.5)] border-cyan-400",
           core: "bg-gradient-to-tr from-cyan-600 to-blue-500 animate-spin",
-          label: "Thinking...",
+          label: "Friday is thinking...",
           badgeColor: "bg-cyan-950 text-cyan-400 border-cyan-800",
         };
       case "speaking":
@@ -53,14 +56,18 @@ export function VoiceOrb({
         return {
           glow: "bg-rose-500/20 shadow-[0_0_40px_rgba(244,63,94,0.4)] border-rose-400",
           core: "bg-gradient-to-tr from-rose-600 to-red-500",
-          label: "Voice Error",
+          label: "Microphone / Voice Alert",
           badgeColor: "bg-rose-950 text-rose-400 border-rose-800",
         };
       default: // idle
         return {
           glow: "bg-cyan-600/10 shadow-[0_0_30px_rgba(6,182,212,0.2)] border-cyan-800/60",
           core: "bg-gradient-to-tr from-cyan-950 via-slate-900 to-cyan-900",
-          label: isWakeWordActive ? "Wake-word Active ('Friday')" : "Push to Talk",
+          label: isWakeWordActive
+            ? "Wake-word Active ('Friday')"
+            : speechLang === "bn-BD"
+            ? "কথা বলতে চাপুন (বাংলা)"
+            : "Click to Speak (English)",
           badgeColor: isWakeWordActive
             ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/60"
             : "bg-slate-900 text-slate-400 border-slate-800",
@@ -81,9 +88,8 @@ export function VoiceOrb({
       <button
         onClick={onMicClick}
         className={`relative w-24 h-24 rounded-full flex items-center justify-center border-2 transition-all duration-500 active:scale-95 group focus:outline-none ${currentStyles.glow}`}
-        title={isListening ? "Click to stop listening" : "Click to speak with Friday"}
+        title={isListening ? "কথা শেষ হলে থামাতে ক্লিক করুন" : "কথা বলতে ক্লিক করুন"}
       >
-        {/* Core circle */}
         <div
           className={`w-20 h-20 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-inner ${currentStyles.core}`}
         >
@@ -97,7 +103,7 @@ export function VoiceOrb({
         </div>
       </button>
 
-      {/* State Badge */}
+      {/* State & Language Badge */}
       <div className="mt-3 flex items-center gap-2">
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${currentStyles.badgeColor}`}
@@ -116,7 +122,7 @@ export function VoiceOrb({
           {currentStyles.label}
         </span>
 
-        {/* Stop Speaking Button (when actively speaking) */}
+        {/* Stop Speaking Button */}
         {isSpeaking && (
           <button
             onClick={onStopSpeaking}
@@ -129,13 +135,13 @@ export function VoiceOrb({
         )}
       </div>
 
-      {/* Live Recognized Transcript Preview */}
-      {liveTranscript && (
-        <div className="mt-3 max-w-md px-4 py-2 rounded-xl bg-slate-900/90 border border-cyan-800/60 text-xs text-cyan-200 text-center animate-fadeIn shadow-lg">
-          <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block mb-0.5">
-            Hearing:
+      {/* Live Recognized Speech Preview */}
+      {liveHearing && (
+        <div className="mt-3 max-w-md px-4 py-2 rounded-xl bg-slate-900/95 border border-cyan-700/80 text-xs text-cyan-200 text-center animate-fadeIn shadow-xl">
+          <span className="text-[10px] uppercase font-semibold tracking-wider text-cyan-400 block mb-0.5">
+            {speechLang === "bn-BD" ? "শুনছি (বাংলা):" : "Hearing (English):"}
           </span>
-          <span className="italic font-medium font-sans">"{liveTranscript}"</span>
+          <span className="font-medium font-sans">"{liveHearing}"</span>
         </div>
       )}
     </div>

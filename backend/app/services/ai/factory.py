@@ -1,16 +1,21 @@
 """Factory function to provide the active AI provider."""
 
 import logging
-from app.core.config import settings
+from app.core.config import get_fresh_settings
 from app.services.ai.base import BaseAIProvider
 from app.services.ai.mock_provider import MockAIProvider
 from app.services.ai.gemini_provider import GeminiAIProvider
+from app.services.ai.missing_key_provider import MissingApiKeyProvider
 
 logger = logging.getLogger("mohib_ai.factory")
 
 
 def get_ai_provider() -> BaseAIProvider:
-    """Resolve and return the configured AI provider based on settings."""
+    """Resolve and return the configured AI provider based on fresh environment settings.
+
+    Never silently falls back to Mock provider when a real cloud provider is configured.
+    """
+    settings = get_fresh_settings()
     provider_type = (settings.AI_PROVIDER or "mock").strip().lower()
 
     if provider_type == "gemini":
@@ -22,11 +27,11 @@ def get_ai_provider() -> BaseAIProvider:
             )
         else:
             logger.warning(
-                "Gemini AI provider requested, but GEMINI_API_KEY is not set. Falling back to MockAIProvider."
+                "Gemini AI provider is selected in .env, but GEMINI_API_KEY is missing. "
+                "Returning MissingApiKeyProvider."
             )
-            return MockAIProvider(model_name="friday-demo-v1")
+            return MissingApiKeyProvider(provider_target="gemini")
 
-    # Default to mock/demo provider
-    logger.info("Using Mock/Demo AI Provider (zero-cost, offline-ready).")
+    # Explicit Demo Mode
+    logger.info("Using Mock/Demo AI Provider (offline fallback).")
     return MockAIProvider(model_name="friday-demo-v1")
-

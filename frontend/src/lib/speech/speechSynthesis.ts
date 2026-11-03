@@ -193,3 +193,4 @@ export class SpeechSynthesisService {
     return this.isSpeaking;
   }
 }
+
