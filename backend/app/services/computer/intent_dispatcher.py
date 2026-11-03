@@ -118,21 +118,23 @@ class ComputerIntentDispatcher:
         ):
             return self._handle_list_files(bangla_lang)
 
-        # 4. Search File Intent
-        search_match = re.search(
-            r"(?:search|find|খুঁজে বের করো|সার্চ করো|search for)\s+(?:file\s+)?([a-zA-Z0-9_\-\.]+)",
-            msg,
-            re.IGNORECASE,
-        ) or re.search(
-            r"([a-zA-Z0-9_\-\.]+)\s+(?:search|find|খুঁজুন|খোঁজ|search koro)",
-            msg,
-            re.IGNORECASE,
-        )
-        if search_match:
-            filename = search_match.group(1).strip()
-            # Avoid matching common words
-            if filename.lower() not in {"files", "project", "system", "info", "me", "the", "a", "koro", "dekhao"}:
-                return self._handle_search_file(filename, bangla_lang)
+        # 4. Search File Intent (Exclude web search queries like Google/YouTube)
+        is_web_query = any(w in msg_lower for w in ["google", "youtube", "online", "website", "web", "browser", "internet"])
+        if not is_web_query:
+            search_match = re.search(
+                r"(?:search|find|খুঁজে বের করো|সার্চ করো|search for)\s+(?:file\s+)?([a-zA-Z0-9_\-\.]+)",
+                msg,
+                re.IGNORECASE,
+            ) or re.search(
+                r"([a-zA-Z0-9_\-\.]+)\s+(?:search|find|খুঁজুন|খোঁজ|search koro)",
+                msg,
+                re.IGNORECASE,
+            )
+            if search_match:
+                filename = search_match.group(1).strip()
+                # Avoid matching common words
+                if filename.lower() not in {"files", "project", "system", "info", "me", "the", "a", "koro", "dekhao", "google", "youtube"}:
+                    return self._handle_search_file(filename, bangla_lang)
 
         # 5. Read File Intent
         read_match = re.search(

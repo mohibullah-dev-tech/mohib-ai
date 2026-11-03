@@ -26,6 +26,7 @@ import {
   Laptop,
   FolderLock,
   ShieldAlert,
+  Globe,
 } from "lucide-react";
 import {
   ChatMessage,
@@ -45,6 +46,7 @@ import { useVoiceAssistant } from "@/lib/speech/useVoiceAssistant";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { VoiceSettingsModal } from "@/components/VoiceSettingsModal";
 import { ComputerControlModal } from "@/components/ComputerControlModal";
+import { BrowserControlModal } from "@/components/BrowserControlModal";
 import { ApprovalDialog } from "@/components/ApprovalDialog";
 
 interface Conversation {
@@ -72,6 +74,7 @@ export default function FridayWorkspace() {
 
   // Milestone 4: Windows Computer Control States
   const [computerModalOpen, setComputerModalOpen] = useState<boolean>(false);
+  const [browserModalOpen, setBrowserModalOpen] = useState<boolean>(false);
   const [activeApproval, setActiveApproval] = useState<ApprovalRequest | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
   const [isApprovalProcessing, setIsApprovalProcessing] = useState<boolean>(false);
@@ -664,6 +667,16 @@ export default function FridayWorkspace() {
                 </span>
               )}
             </button>
+
+            {/* Browser Control Button (Milestone 5) */}
+            <button
+              onClick={() => setBrowserModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition"
+              title="Safe Browser Automation & Web Inspection"
+            >
+              <Globe className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Browser</span>
+            </button>
           </div>
         </header>
 
@@ -1059,6 +1072,13 @@ export default function FridayWorkspace() {
         onOpenApproval={(req) => setActiveApproval(req)}
         pendingCount={pendingApprovals.length}
         onRefreshPending={checkHealth}
+      />
+
+      {/* Safe Browser Automation Modal (Milestone 5) */}
+      <BrowserControlModal
+        isOpen={browserModalOpen}
+        onClose={() => setBrowserModalOpen(false)}
+        onOpenApproval={(req) => setActiveApproval(req)}
       />
 
       {/* Permission Approval Dialog (Single-Use Confirmation) */}

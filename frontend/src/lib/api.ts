@@ -159,6 +159,66 @@ export interface ProjectInspectionResponse {
   summary_en: string;
 }
 
+// --- Milestone 5: Safe Browser Automation Types ---
+
+export interface BrowserStatusResponse {
+  is_active: boolean;
+  current_url: string;
+  page_title: string;
+  is_stopped: boolean;
+  console_errors_count: number;
+  history_count: number;
+  last_screenshot_available: boolean;
+}
+
+export interface BrowserContentResponse {
+  url: string;
+  title: string;
+  content: string;
+  chars_count: number;
+  lines_count: number;
+}
+
+export interface BrowserInteractiveElements {
+  links: Array<{ text: string; href: string; selector: string }>;
+  buttons: Array<{ text: string; type: string; is_submit: boolean; selector: string }>;
+  inputs: Array<{ name: string; placeholder: string; type: string; selector: string }>;
+}
+
+export interface BrowserScreenshotResponse {
+  screenshot_b64: string;
+  url: string;
+  title: string;
+  timestamp: string;
+}
+
+export interface BrowserInspectionResponse {
+  url: string;
+  title: string;
+  structure: {
+    headings: { h1: string[]; h2: string[]; h3: string[] };
+    imagesTotal: number;
+    imagesMissingAlt: number;
+    inputsTotal: number;
+    inputsMissingLabels: number;
+    linksCount: number;
+    buttonsCount: number;
+    formsCount: number;
+  };
+  viewports: Record<string, {
+    label: string;
+    width: number;
+    height: number;
+    screenshot_b64: string;
+  }>;
+  issues_bn: string[];
+  issues_en: string[];
+  suggestions_bn: string[];
+  suggestions_en: string[];
+  summary_bn: string;
+  summary_en: string;
+}
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
@@ -406,5 +466,139 @@ export async function inspectProject(projectPath?: string): Promise<ProjectInspe
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || "Failed to inspect project");
   }
+  return response.json();
+}
+
+// --- Milestone 5: Safe Browser Automation Client ---
+
+export async function getBrowserStatus(): Promise<BrowserStatusResponse> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/status`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Failed to fetch browser status");
+  return response.json();
+}
+
+export async function launchBrowser(headless: boolean = true): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/launch?headless=${headless}`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to launch browser");
+  return response.json();
+}
+
+export async function closeBrowser(): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/close`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to close browser");
+  return response.json();
+}
+
+export async function browserNavigate(url: string): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/navigate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Navigation failed");
+  }
+  return response.json();
+}
+
+export const navigateBrowser = browserNavigate;
+
+export async function getBrowserContent(maxLength: number = 8000): Promise<BrowserContentResponse> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/content?max_length=${maxLength}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Failed to read webpage content");
+  return response.json();
+}
+
+export async function getBrowserElements(): Promise<BrowserInteractiveElements> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/elements`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Failed to extract interactive elements");
+  return response.json();
+}
+
+export async function captureBrowserScreenshot(fullPage: boolean = false): Promise<BrowserScreenshotResponse> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/screenshot?full_page=${fullPage}`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to capture screenshot");
+  return response.json();
+}
+
+export async function browserClick(
+  selector: string,
+  description: string = "",
+  forceApproval: boolean = false
+): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/click`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selector, description, force_approval: forceApproval }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Click action failed");
+  }
+  return response.json();
+}
+
+export async function browserFill(selector: string, text: string): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/fill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selector, text }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Fill action failed");
+  }
+  return response.json();
+}
+
+export async function browserScroll(direction: string = "down", amount: number = 500): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/scroll`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ direction, amount }),
+  });
+  if (!response.ok) throw new Error("Scroll action failed");
+  return response.json();
+}
+
+export async function browserStop(): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/stop`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Stop automation failed");
+  return response.json();
+}
+
+export async function inspectWebpage(url?: string): Promise<BrowserInspectionResponse> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/inspect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: url || null }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Webpage inspection failed");
+  }
+  return response.json();
+}
+
+export async function getBrowserHistory(): Promise<any[]> {
+  const response = await fetch(`${BACKEND_URL}/api/browser/history`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Failed to fetch browser history");
   return response.json();
 }

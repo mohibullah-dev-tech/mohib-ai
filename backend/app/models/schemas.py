@@ -142,3 +142,39 @@ class InspectProjectPayload(BaseModel):
     """Request payload to inspect a project directory."""
 
     project_path: Optional[str] = Field(default=None, description="Project path to inspect (defaults to primary allowed dir)")
+
+
+# --- Safe Browser Automation Agent Schemas (Milestone 5) ---
+
+class BrowserNavigateRequest(BaseModel):
+    """Request payload to navigate browser to a URL."""
+
+    url: str = Field(..., description="Target webpage URL to visit")
+
+
+class BrowserClickRequest(BaseModel):
+    """Request payload to click an interactive element."""
+
+    selector: str = Field(..., description="CSS or text selector of element to click")
+    description: Optional[str] = Field(default="", description="Descriptive text of target element")
+    force_approval: Optional[bool] = Field(default=False, description="Require user approval before clicking")
+
+
+class BrowserFillRequest(BaseModel):
+    """Request payload to fill a text field."""
+
+    selector: str = Field(..., description="Selector of input field")
+    text: str = Field(..., description="Text content to enter")
+
+
+class BrowserScrollRequest(BaseModel):
+    """Request payload to scroll the active page."""
+
+    direction: Optional[str] = Field(default="down", description="'down' or 'up'")
+    amount: Optional[int] = Field(default=500, description="Pixel amount to scroll")
+
+
+class BrowserInspectRequest(BaseModel):
+    """Request payload to run website inspection."""
+
+    url: Optional[str] = Field(default=None, description="Optional target URL (defaults to active page)")
