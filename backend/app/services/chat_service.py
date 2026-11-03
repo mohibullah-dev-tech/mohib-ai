@@ -3,6 +3,7 @@
 import logging
 from app.models.schemas import ChatRequest, ChatResponse
 from app.services.ai.router import ai_router
+from app.services.computer import computer_intent_dispatcher
 
 logger = logging.getLogger("mohib_ai.chat_service")
 
@@ -11,14 +12,26 @@ class ChatService:
     """Service orchestrating chat request validation, context handling, and router execution."""
 
     async def process_chat(self, request: ChatRequest) -> ChatResponse:
-        """Process incoming chat request dynamically routing to Gemini, OpenAI, or Mock."""
+        """Process incoming chat request dynamically routing to Local Agent, Gemini, OpenAI, or Mock."""
         logger.info(
             f"Processing chat request. Mode: [{request.preferred_provider or 'auto'}], "
             f"Message length: {len(request.message)}, History turns: {len(request.history)}"
         )
 
         try:
-            # Delegate generation to intelligent AIRouter
+            # 1. First evaluate if user spoke/sent a direct local computer control command
+            agent_result = computer_intent_dispatcher.handle(request.message)
+            if agent_result is not None:
+                reply_text, provider_name, model_name = agent_result
+                return ChatResponse(
+                    reply=reply_text,
+                    provider=provider_name,
+                    model=model_name,
+                    conversation_id=request.conversation_id,
+                    routing_mode="local_agent",
+                )
+
+            # 2. Otherwise delegate generation to intelligent AIRouter
             reply_text, provider_name, model_name = await ai_router.route_and_generate(
                 message=request.message,
                 history=request.history,

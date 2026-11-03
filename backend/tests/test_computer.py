@@ -240,3 +240,45 @@ def test_project_inspector_endpoint():
     assert "summary_bn" in data
     assert "summary_en" in data
 
+
+def test_voice_chat_system_info_intent():
+    """Verify speaking 'ল্যাপটপ ইনফো দেখাও' returns live system hardware information."""
+    payload = {"message": "ল্যাপটপ ইনফো দেখাও", "history": []}
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "local-windows-agent"
+    assert "সিপিইউ" in data["reply"] or "অপারেটিং সিস্টেম" in data["reply"]
+
+
+def test_voice_chat_inspect_project_intent():
+    """Verify speaking 'প্রজেক্ট ইন্সপেক্ট করো' returns codebase analysis."""
+    payload = {"message": "প্রজেক্ট ইন্সপেক্ট করো", "history": []}
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "local-windows-agent"
+    assert "প্রজেক্ট" in data["reply"]
+    assert "টেক স্ট্যাক" in data["reply"] or "কনফিগারেশন" in data["reply"]
+
+
+def test_voice_chat_list_files_intent():
+    """Verify speaking 'ফাইলগুলো দেখাও' lists permitted files."""
+    payload = {"message": "ফাইলগুলো দেখাও", "history": []}
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "local-windows-agent"
+    assert "ডিরেক্টরি" in data["reply"] or "ফাইলসমূহ" in data["reply"]
+
+
+def test_voice_chat_create_file_intent():
+    """Verify speaking 'নতুন ফাইল তৈরি করো test_voice.txt' generates an explicit approval request."""
+    payload = {"message": "নতুন ফাইল তৈরি করো test_voice.txt", "history": []}
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "local-windows-agent"
+    assert "অনুমোদন" in data["reply"] or "Approval" in data["reply"]
+
+

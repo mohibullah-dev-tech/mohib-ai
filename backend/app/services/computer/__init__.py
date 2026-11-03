@@ -10,6 +10,7 @@ from app.services.computer.permission_engine import (
 )
 from app.services.computer.windows_agent import windows_agent, WindowsComputerAgent
 from app.services.computer.project_inspector import project_inspector, ProjectInspector
+from app.services.computer.intent_dispatcher import computer_intent_dispatcher, ComputerIntentDispatcher
 
 __all__ = [
     "PathGuard",
@@ -23,5 +24,7 @@ __all__ = [
     "WindowsComputerAgent",
     "project_inspector",
     "ProjectInspector",
+    "computer_intent_dispatcher",
+    "ComputerIntentDispatcher",
 ]
 
