@@ -282,3 +282,17 @@ def test_voice_chat_create_file_intent():
     assert "অনুমোদন" in data["reply"] or "Approval" in data["reply"]
 
 
+def test_voice_chat_shutdown_laptop_intent():
+    """Verify speaking 'shut down laptop' generates a critical approval request instead of mock demo."""
+    payload = {"message": "shut down laptop", "history": []}
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "local-windows-agent"
+    assert "Confirmation Required" in data["reply"] or "শাটডাউন অনুমোদন" in data["reply"]
+    # Verify a pending request was actually created
+    pending = permission_engine.get_pending_requests()
+    assert any(p.action_name == "power_shutdown" for p in pending)
+
+
+

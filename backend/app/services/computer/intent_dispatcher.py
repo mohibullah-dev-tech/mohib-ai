@@ -46,6 +46,40 @@ class ComputerIntentDispatcher:
         msg_lower = msg.lower()
         bangla_lang = self.is_bangla(msg)
 
+        # 0. Power Controls Intent (Shutdown / Restart / Lock / Cancel)
+        shutdown_patterns = [
+            "shut down laptop", "shutdown laptop", "shut down computer", "shutdown computer",
+            "shut down pc", "shutdown pc", "turn off laptop", "turn off computer", "power off laptop",
+            "ল্যাপটপ বন্ধ করো", "ল্যাপটপ শাটডাউন করো", "শাট ডাউন করো", "ল্যাপটপ বন্ধ",
+            "laptop bondho koro", "laptop shutdown koro", "shutdown koro", "shut down", "shutdown"
+        ]
+        if any(p in msg_lower for p in shutdown_patterns) or (
+            ("shut" in msg_lower and "down" in msg_lower and ("laptop" in msg_lower or "pc" in msg_lower or "computer" in msg_lower or len(msg.split()) <= 3))
+            or ("bondho" in msg_lower and ("laptop" in msg_lower or "pc" in msg_lower or "computer" in msg_lower))
+        ):
+            return self._handle_power_request("shutdown", bangla_lang)
+
+        restart_patterns = [
+            "restart laptop", "reboot laptop", "restart computer", "reboot computer",
+            "restart pc", "reboot pc", "ল্যাপটপ রিস্টার্ট করো", "ল্যাপটপ রিবুট করো",
+            "রিস্টার্ট করো", "laptop restart koro"
+        ]
+        if any(p in msg_lower for p in restart_patterns) or ("restart" in msg_lower and ("laptop" in msg_lower or "pc" in msg_lower or "computer" in msg_lower or len(msg.split()) <= 2)):
+            return self._handle_power_request("restart", bangla_lang)
+
+        lock_patterns = [
+            "lock laptop", "lock screen", "lock computer", "lock pc",
+            "ল্যাপটপ লক করো", "স্ক্রিন লক করো", "laptop lock koro"
+        ]
+        if any(p in msg_lower for p in lock_patterns) or ("lock" in msg_lower and ("laptop" in msg_lower or "screen" in msg_lower or "pc" in msg_lower or len(msg.split()) <= 2)):
+            return self._handle_power_request("lock", bangla_lang)
+
+        cancel_patterns = [
+            "cancel shutdown", "abort shutdown", "শাটডাউন বাতিল করো", "shutdown cancel koro"
+        ]
+        if any(p in msg_lower for p in cancel_patterns):
+            return self._handle_power_request("cancel", bangla_lang)
+
         # 1. System Info / Hardware Specs Intent
         sys_keywords = [
             "system info", "laptop info", "pc specs", "hardware info", "computer info",
@@ -319,6 +353,68 @@ class ComputerIntentDispatcher:
             )
 
         return reply, "local-windows-agent", "approval-v1"
+
+    def _handle_power_request(self, action: str, bangla: bool) -> Tuple[str, str, str]:
+        """Generate a secure approval request for Windows power operations."""
+        req = windows_agent.request_power_action(
+            action=action,
+            explanation=f"Voice/chat requested Windows {action}",
+        )
+
+        if action == "shutdown":
+            if bangla:
+                reply = (
+                    "⚠️ **[ল্যাপটপ শাটডাউন অনুমোদন আবশ্যক]**\n\n"
+                    "বস, আপনি ল্যাপটপ শাটডাউন করার নির্দেশ দিয়েছেন। কোনো অসমাপ্ত কাজের ডাটা যাতে না হারায়, সেজন্য নিরাপত্তা নীতি অনুযায়ী আপনার সুনির্দিষ্ট অনুমোদন প্রয়োজন।\n\n"
+                    f"- **টার্গেট কমান্ড:** `shutdown /s /t 30`\n"
+                    f"- **ঝুঁকির মাত্রা:** `CRITICAL (উচ্চ ঝুঁকি)`\n"
+                    f"- **রিকোয়েস্ট আইডি:** `{req.id[:8]}...`\n\n"
+                    "👉 অনুগ্রহ করে আপনার স্ক্রিনের **Approval Dialog** অথবা **Laptop Control** প্যানেলে গিয়ে **'Approve'** বাটনে ক্লিক করুন। "
+                    "(অনুমোদন দিলে ৩০ সেকেন্ডের মধ্যে কম্পিউটার নিরাপদে শাটডাউন হবে)।"
+                )
+            else:
+                reply = (
+                    "⚠️ **[Windows Laptop Shutdown Confirmation Required]**\n\n"
+                    "Boss, you requested a system shutdown. Per safety policy, destructive system actions require explicit user confirmation to prevent accidental data loss.\n\n"
+                    f"- **Action:** System Shutdown (`shutdown /s /t 30`)\n"
+                    f"- **Risk Level:** `CRITICAL`\n"
+                    f"- **Approval ID:** `{req.id[:8]}...`\n\n"
+                    "👉 Please click **'Approve'** in the confirmation dialog on your screen to proceed. "
+                    "Once approved, your laptop will safely shut down in 30 seconds."
+                )
+        elif action == "restart":
+            if bangla:
+                reply = (
+                    "⚠️ **[ল্যাপটপ রিস্টার্ট অনুমোদন আবশ্যক]**\n\n"
+                    "উইন্ডোজ রিস্টার্ট করার জন্য আপনার অনুমোদন প্রয়োজন।\n\n"
+                    f"- **টার্গেট কমান্ড:** `shutdown /r /t 30`\n"
+                    f"- **ঝুঁকির মাত্রা:** `CRITICAL`\n\n"
+                    "👉 স্ক্রিনে আসা ডায়ালগে **'Approve'** বাটনে ক্লিক করুন।"
+                )
+            else:
+                reply = (
+                    "⚠️ **[System Restart Confirmation Required]**\n\n"
+                    f"- **Target Command:** `shutdown /r /t 30`\n"
+                    f"- **Risk Level:** `CRITICAL`\n\n"
+                    "👉 Please click **'Approve'** in the confirmation dialog on your screen."
+                )
+        elif action == "lock":
+            if bangla:
+                reply = (
+                    "🔒 **[স্ক্রিন লক রিকোয়েস্ট তৈরি হয়েছে]**\n\n"
+                    f"- **টার্গেট কমান্ড:** `LockWorkStation`\n\n"
+                    "👉 স্ক্রিনে **'Approve'** ক্লিক করলেই সাথে সাথে উইন্ডোজ স্ক্রিন লক হয়ে যাবে।"
+                )
+            else:
+                reply = (
+                    "🔒 **[Lock Workstation Request Created]**\n\n"
+                    f"- **Target Command:** `LockWorkStation`\n\n"
+                    "👉 Click **'Approve'** in the confirmation dialog to lock your screen immediately."
+                )
+        else:
+            reply = "Shutdown cancel command requested." if not bangla else "শাটডাউন বাতিল কমান্ড পাঠানো হয়েছে।"
+
+        return reply, "local-windows-agent", "power-v1"
 
 
 computer_intent_dispatcher = ComputerIntentDispatcher()

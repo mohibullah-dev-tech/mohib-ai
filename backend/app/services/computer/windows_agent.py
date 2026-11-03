@@ -402,6 +402,71 @@ class WindowsComputerAgent:
             risk_level=RiskLevel.HIGH,
         )
 
+    def request_power_action(self, action: str, explanation: str = "") -> ApprovalRequest:
+        """Create a pending approval request for system power operations (shutdown, restart, lock)."""
+        action_clean = action.lower().strip()
+        if action_clean in {"shutdown", "shut_down", "power_off"}:
+            cmd = "shutdown /s /t 30 /c \"Friday AI: System shutdown authorized by user\""
+            details = {
+                "command": cmd,
+                "power_action": "shutdown",
+                "explanation": explanation or "Windows laptop shutdown requested via Friday voice/chat.",
+                "warning": "⚠️ DESTRUCTIVE ACTION: Windows will close all running applications and shut down in 30 seconds. Unsaved work will be lost.",
+            }
+            return permission_engine.create_request(
+                action_type=ActionType.DESTRUCTIVE,
+                action_name="power_shutdown",
+                target=cmd,
+                details=details,
+                risk_level=RiskLevel.CRITICAL,
+            )
+        elif action_clean in {"restart", "reboot"}:
+            cmd = "shutdown /r /t 30 /c \"Friday AI: System restart authorized by user\""
+            details = {
+                "command": cmd,
+                "power_action": "restart",
+                "explanation": explanation or "Windows laptop restart requested via Friday voice/chat.",
+                "warning": "⚠️ DESTRUCTIVE ACTION: Windows will close all running applications and restart in 30 seconds.",
+            }
+            return permission_engine.create_request(
+                action_type=ActionType.DESTRUCTIVE,
+                action_name="power_restart",
+                target=cmd,
+                details=details,
+                risk_level=RiskLevel.CRITICAL,
+            )
+        elif action_clean in {"lock", "lock_screen", "lock_workstation"}:
+            cmd = "rundll32.exe user32.dll,LockWorkStation"
+            details = {
+                "command": cmd,
+                "power_action": "lock",
+                "explanation": explanation or "Lock Windows desktop screen.",
+                "warning": "Locks your desktop workstation immediately.",
+            }
+            return permission_engine.create_request(
+                action_type=ActionType.EXECUTION,
+                action_name="power_lock",
+                target=cmd,
+                details=details,
+                risk_level=RiskLevel.LOW,
+            )
+        elif action_clean in {"cancel", "cancel_shutdown", "abort"}:
+            cmd = "shutdown /a"
+            details = {
+                "command": cmd,
+                "power_action": "cancel_shutdown",
+                "explanation": explanation or "Cancel scheduled Windows shutdown.",
+            }
+            return permission_engine.create_request(
+                action_type=ActionType.EXECUTION,
+                action_name="cancel_shutdown",
+                target=cmd,
+                details=details,
+                risk_level=RiskLevel.LOW,
+            )
+        else:
+            raise ValueError(f"Unsupported power action '{action}'.")
+
     # -------------------------------------------------------------------------
     # 5. Execution of Approved Actions
     # -------------------------------------------------------------------------
@@ -463,10 +528,10 @@ class WindowsComputerAgent:
                 os.remove(valid_path)
                 return {"message": f"Successfully deleted file '{valid_path}'", "path": valid_path}
 
-        elif action_name == "execute_command":
-            cmd = target
+        elif action_name in {"execute_command", "power_shutdown", "power_restart", "power_lock", "cancel_shutdown"}:
+            cmd = details.get("command") or target
             cwd = details.get("cwd")
-            valid_cwd = self.path_guard.validate_path(cwd) if cwd else None
+            valid_cwd = self.path_guard.validate_path(cwd) if (cwd and os.path.exists(cwd)) else None
 
             # Execute with safe 15s timeout
             proc = subprocess.run(
