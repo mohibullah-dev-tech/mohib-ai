@@ -24,6 +24,8 @@ frontend/out/
 node_modules/
 .next/
 out/
+AGENTS.md
+frontend/AGENTS.md
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

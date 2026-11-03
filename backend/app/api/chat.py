@@ -38,3 +38,4 @@ async def send_chat_message(request: ChatRequest) -> ChatResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Friday internal server error during chat processing.",
         )
+

@@ -29,3 +29,4 @@ def get_ai_provider() -> BaseAIProvider:
     # Default to mock/demo provider
     logger.info("Using Mock/Demo AI Provider (zero-cost, offline-ready).")
     return MockAIProvider(model_name="friday-demo-v1")
+

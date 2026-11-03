@@ -28,3 +28,4 @@ class BaseAIProvider(ABC):
             The assistant's generated textual reply.
         """
         pass
+

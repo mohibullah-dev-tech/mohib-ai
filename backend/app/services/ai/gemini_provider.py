@@ -90,3 +90,4 @@ class GeminiAIProvider(BaseAIProvider):
         except Exception as e:
             logger.error(f"Unexpected error communicating with Gemini API: {str(e)}")
             return f"Friday encountered an unexpected error while contacting Gemini API: {str(e)}"
+

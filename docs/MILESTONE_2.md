@@ -37,3 +37,4 @@
 - System prompt and API keys reside exclusively on the FastAPI server (`.env`).
 - Backend strictly bound to `127.0.0.1:8000` with explicit CORS.
 - No arbitrary terminal command or file execution capability exposed to the chat endpoint.
+

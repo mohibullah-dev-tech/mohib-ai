@@ -78,3 +78,4 @@ def test_root_includes_chat_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data.get("chat_endpoint") == "/api/chat"
+

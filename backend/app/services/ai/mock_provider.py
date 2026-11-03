@@ -121,3 +121,4 @@ class MockAIProvider(BaseAIProvider):
             f"As your personal assistant Friday, I am currently running on the local Demo Brain. "
             f"You can add a `GEMINI_API_KEY` in `.env` anytime to connect live cloud intelligence."
         )
+
