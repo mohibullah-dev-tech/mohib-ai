@@ -185,3 +185,4 @@ def test_10_handle_browser_crashes_and_recovery():
     launch_res = client.post("/api/browser/launch?headless=true")
     assert launch_res.status_code == 200
     assert launch_res.json()["is_active"] is True
+

@@ -29,3 +29,4 @@ __all__ = [
     "browser_intent_dispatcher",
     "BrowserIntentDispatcher",
 ]
+

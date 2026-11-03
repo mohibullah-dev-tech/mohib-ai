@@ -156,3 +156,4 @@ async def inspect_website(payload: Optional[BrowserInspectRequest] = None):
 def get_browser_history():
     """Get audit trail of recent browser actions."""
     return playwright_browser.get_action_history()
+

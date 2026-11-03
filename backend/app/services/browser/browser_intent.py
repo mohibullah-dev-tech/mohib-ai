@@ -181,3 +181,4 @@ class BrowserIntentDispatcher:
 
 
 browser_intent_dispatcher = BrowserIntentDispatcher()
+
