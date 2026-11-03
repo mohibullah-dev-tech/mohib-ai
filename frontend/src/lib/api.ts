@@ -25,6 +25,26 @@ export interface AssistantInfoResponse {
   features: string[];
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  history: ChatMessage[];
+  conversation_id?: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  provider: string;
+  model: string;
+  timestamp: string;
+  conversation_id?: string;
+}
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
@@ -63,6 +83,46 @@ export async function getAssistantInfo(): Promise<AssistantInfoResponse> {
     throw new Error(
       `Failed to fetch assistant info: ${response.status} ${response.statusText}`
     );
+  }
+
+  return response.json();
+}
+
+/**
+ * Send chat message to Friday backend API.
+ */
+export async function sendChatMessage(
+  message: string,
+  history: ChatMessage[] = [],
+  conversationId?: string
+): Promise<ChatResponse> {
+  const payload: ChatRequest = {
+    message,
+    history,
+    conversation_id: conversationId,
+  };
+
+  const response = await fetch(`${BACKEND_URL}/api/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorDetail = `Status ${response.status}`;
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) {
+        errorDetail = Array.isArray(errJson.detail)
+          ? errJson.detail.map((d: { msg?: string }) => d.msg || "").join(", ")
+          : String(errJson.detail);
+      }
+    } catch {
+      // ignore json parse error
+    }
+    throw new Error(`Chat error (${errorDetail})`);
   }
 
   return response.json();

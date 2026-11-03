@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.health import router as health_router
+from app.api.chat import router as chat_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
     """Lifecycle event handler for backend startup and shutdown."""
     logger.info("Initializing Friday AI backend...")
     logger.info(f"Host: {settings.BACKEND_HOST}, Port: {settings.BACKEND_PORT}")
+    logger.info(f"Active AI Provider: {settings.AI_PROVIDER}")
     logger.info(f"Allowed CORS Origins: {settings.cors_origins}")
     yield
     logger.info("Shutting down Friday AI backend gracefully.")
@@ -42,6 +44,7 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(health_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 
 
 @app.get("/", tags=["Root"])
@@ -52,6 +55,7 @@ async def root():
         "assistant": "Friday",
         "docs_url": "/docs",
         "health_check": "/api/health",
+        "chat_endpoint": "/api/chat",
     }
 
 
@@ -64,4 +68,3 @@ if __name__ == "__main__":
         port=settings.BACKEND_PORT,
         reload=True,
     )
-
