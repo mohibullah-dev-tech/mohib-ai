@@ -239,3 +239,4 @@ def test_project_inspector_endpoint():
     assert "tree" in data
     assert "summary_bn" in data
     assert "summary_en" in data
+

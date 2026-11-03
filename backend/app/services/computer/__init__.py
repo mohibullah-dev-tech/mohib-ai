@@ -24,3 +24,4 @@ __all__ = [
     "project_inspector",
     "ProjectInspector",
 ]
+

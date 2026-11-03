@@ -190,3 +190,4 @@ class PathGuard:
             return False, f"Cannot inspect file: {e}"
 
         return True, "Valid text/code file"
+

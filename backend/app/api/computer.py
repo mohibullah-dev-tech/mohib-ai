@@ -198,3 +198,4 @@ def inspect_project(payload: Optional[InspectProjectPayload] = None):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
