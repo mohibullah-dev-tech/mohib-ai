@@ -1,5 +1,6 @@
 """Application configuration using Pydantic Settings."""
 
+import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     """Configuration settings for Mohib AI backend."""
 
     APP_NAME: str = "Mohib AI (Friday) Backend"
-    APP_VERSION: str = "0.3.5"
+    APP_VERSION: str = "0.4.0"
     ENVIRONMENT: str = "development"
     BACKEND_HOST: str = "127.0.0.1"
     BACKEND_PORT: int = 8000
@@ -27,6 +28,16 @@ class Settings(BaseSettings):
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+
+    # Safe Local Windows Computer Agent Settings (Milestone 4)
+    LOCAL_AGENT_ENABLED: bool = True
+    # Comma-separated list of permitted base directories.
+    # Empty string defaults to current project workspace directory only.
+    ALLOWED_DIRECTORIES: str = ""
+    # Optional shared local auth token for computer control endpoints
+    LOCAL_AGENT_TOKEN: Optional[str] = None
+    # Maximum file read size in bytes (2MB default)
+    MAX_FILE_READ_BYTES: int = 2 * 1024 * 1024
 
     # Legacy alias support
     AI_MODEL_NAME: str = "gemini-1.5-flash"
@@ -59,6 +70,18 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Parse comma-separated origins into a list of cleaned strings."""
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    def get_allowed_directories_list(self) -> List[str]:
+        """Return list of canonical absolute allowed directory paths."""
+        if not self.ALLOWED_DIRECTORIES.strip():
+            # Default to the root workspace directory
+            return [os.path.abspath(os.getcwd())]
+        dirs = []
+        for d in self.ALLOWED_DIRECTORIES.split(","):
+            cleaned = d.strip()
+            if cleaned:
+                dirs.append(os.path.abspath(cleaned))
+        return dirs or [os.path.abspath(os.getcwd())]
 
 
 def get_fresh_settings() -> Settings:

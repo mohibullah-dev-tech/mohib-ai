@@ -23,20 +23,29 @@ import {
   Globe2,
   Cpu,
   Zap,
+  Laptop,
+  FolderLock,
+  ShieldAlert,
 } from "lucide-react";
 import {
   ChatMessage,
   ChatResponse,
   HealthResponse,
   ProviderStatusResponse,
+  ApprovalRequest,
   sendChatMessage,
   getBackendHealth,
   getProviderStatus,
+  getPendingActions,
+  approveAction,
+  rejectAction,
 } from "@/lib/api";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { useVoiceAssistant } from "@/lib/speech/useVoiceAssistant";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { VoiceSettingsModal } from "@/components/VoiceSettingsModal";
+import { ComputerControlModal } from "@/components/ComputerControlModal";
+import { ApprovalDialog } from "@/components/ApprovalDialog";
 
 interface Conversation {
   id: string;
@@ -60,6 +69,12 @@ export default function FridayWorkspace() {
   const [wakeWordNotice, setWakeWordNotice] = useState<string | null>(null);
   const [aiProviderMode, setAiProviderMode] = useState<"auto" | "gemini" | "openai">("auto");
   const [providerStatus, setProviderStatus] = useState<ProviderStatusResponse | null>(null);
+
+  // Milestone 4: Windows Computer Control States
+  const [computerModalOpen, setComputerModalOpen] = useState<boolean>(false);
+  const [activeApproval, setActiveApproval] = useState<ApprovalRequest | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
+  const [isApprovalProcessing, setIsApprovalProcessing] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -124,7 +139,7 @@ export default function FridayWorkspace() {
     }
   }, [conversations]);
 
-  // Check backend health and providers status periodically
+  // Check backend health, providers status, and pending approvals periodically
   const checkHealth = useCallback(async () => {
     try {
       const data = await getBackendHealth();
@@ -139,7 +154,50 @@ export default function FridayWorkspace() {
     } catch {
       setProviderStatus(null);
     }
-  }, []);
+
+    try {
+      const pending = await getPendingActions();
+      setPendingApprovals(pending);
+      // If there is an urgent pending approval and no modal is active, display it
+      if (pending.length > 0 && !activeApproval) {
+        setActiveApproval(pending[0]);
+      }
+    } catch {
+      setPendingApprovals([]);
+    }
+  }, [activeApproval]);
+
+  const handleApproveAction = async (id: string) => {
+    setIsApprovalProcessing(true);
+    try {
+      await approveAction(id);
+      setActiveApproval(null);
+      // Refresh pending list
+      const updated = await getPendingActions();
+      setPendingApprovals(updated);
+      voice.speak("Action approved and executed successfully.");
+    } catch (err: any) {
+      alert(err.message || "Approval failed");
+    } finally {
+      setIsApprovalProcessing(false);
+    }
+  };
+
+  const handleRejectAction = async (id: string, reason?: string) => {
+    setIsApprovalProcessing(true);
+    try {
+      await rejectAction(id, reason);
+      setActiveApproval(null);
+      // Refresh pending list
+      const updated = await getPendingActions();
+      setPendingApprovals(updated);
+      voice.speak("Action rejected.");
+    } catch (err: any) {
+      alert(err.message || "Rejection failed");
+    } finally {
+      setIsApprovalProcessing(false);
+    }
+  };
 
   useEffect(() => {
     checkHealth();
@@ -420,6 +478,27 @@ export default function FridayWorkspace() {
             </span>
           </button>
 
+          {/* Laptop Control Sidebar Button */}
+          <button
+            onClick={() => {
+              setComputerModalOpen(true);
+              setSidebarOpen(false);
+            }}
+            className="flex items-center justify-between w-full px-3 py-2 text-xs rounded-xl bg-slate-950/60 border border-slate-800 hover:border-cyan-700/60 transition"
+          >
+            <span className="flex items-center gap-1.5">
+              <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Laptop Control</span>
+            </span>
+            {pendingApprovals.length > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold animate-pulse">
+                {pendingApprovals.length}
+              </span>
+            ) : (
+              <span className="text-[10px] text-emerald-400 font-mono">Safe</span>
+            )}
+          </button>
+
           {/* Backend Status indicator */}
           <div className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800">
             <span className="text-slate-400 text-[11px] flex items-center gap-1.5">
@@ -570,8 +649,45 @@ export default function FridayWorkspace() {
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">Settings</span>
             </button>
+
+            {/* Laptop Control Button */}
+            <button
+              onClick={() => setComputerModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition relative"
+              title="Windows Laptop Agent Control & Permissions"
+            >
+              <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Laptop Control</span>
+              {pendingApprovals.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold animate-pulse">
+                  {pendingApprovals.length}
+                </span>
+              )}
+            </button>
           </div>
         </header>
+
+        {/* Pending Permission Approval Action Banner */}
+        {pendingApprovals.length > 0 && (
+          <div className="bg-amber-950/90 border-b border-amber-800 text-amber-200 text-xs px-4 py-2.5 flex items-center justify-between animate-fadeIn">
+            <span className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
+              <span>
+                <strong>Action Requires Approval:</strong> Friday requests permission for{" "}
+                <span className="font-mono text-cyan-300 uppercase">{pendingApprovals[0].action_name}</span> on{" "}
+                <code className="text-amber-300 font-mono">{pendingApprovals[0].target}</code>
+              </span>
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveApproval(pendingApprovals[0])}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition shadow-sm"
+              >
+                Review & Decide
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Wake Word Toast Notice */}
         {wakeWordNotice && (
@@ -934,6 +1050,23 @@ export default function FridayWorkspace() {
         aiProviderMode={aiProviderMode}
         onSelectProviderMode={handleSelectProviderMode}
         providerStatus={providerStatus}
+      />
+
+      {/* Safe Windows Computer Control Modal (Milestone 4) */}
+      <ComputerControlModal
+        isOpen={computerModalOpen}
+        onClose={() => setComputerModalOpen(false)}
+        onOpenApproval={(req) => setActiveApproval(req)}
+        pendingCount={pendingApprovals.length}
+        onRefreshPending={checkHealth}
+      />
+
+      {/* Permission Approval Dialog (Single-Use Confirmation) */}
+      <ApprovalDialog
+        request={activeApproval}
+        onApprove={handleApproveAction}
+        onReject={handleRejectAction}
+        isProcessing={isApprovalProcessing}
       />
 
       {/* Clear Confirmation Modal */}

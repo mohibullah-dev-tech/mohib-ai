@@ -111,3 +111,34 @@ class ProviderStatusResponse(BaseModel):
 
     active_mode: str
     providers: Dict[str, ProviderInfo]
+
+
+# --- Safe Windows Computer Control Schemas (Milestone 4) ---
+
+class AddAllowedDirRequest(BaseModel):
+    """Request to add a permitted directory."""
+
+    path: str = Field(..., description="Absolute path of directory to allow")
+
+
+class ActionRequestPayload(BaseModel):
+    """Request to initiate a protected computer action requiring approval."""
+
+    action_name: str = Field(..., description="'create_file', 'modify_file', 'delete_path', 'execute_command'")
+    target: str = Field(..., description="Target file path or command string")
+    content: Optional[str] = Field(default=None, description="Content for file write/modify operations")
+    command: Optional[str] = Field(default=None, description="Command to execute")
+    cwd: Optional[str] = Field(default=None, description="Working directory for command execution")
+    explanation: Optional[str] = Field(default=None, description="Human-readable explanation of why action is needed")
+
+
+class ActionDecisionPayload(BaseModel):
+    """Decision response when rejecting an approval request."""
+
+    reason: Optional[str] = Field(default="Rejected by user", description="Reason for rejection")
+
+
+class InspectProjectPayload(BaseModel):
+    """Request payload to inspect a project directory."""
+
+    project_path: Optional[str] = Field(default=None, description="Project path to inspect (defaults to primary allowed dir)")
