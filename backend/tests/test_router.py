@@ -72,3 +72,4 @@ def test_router_explicit_openai_without_key():
     data = response.json()
     assert "openai-unconfigured" in data["provider"] or "openai" in data["provider"]
     assert "OPENAI_API_KEY" in data["reply"]
+

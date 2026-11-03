@@ -126,3 +126,4 @@ class BenchmarkRunner:
 
 
 benchmark_runner = BenchmarkRunner()
+

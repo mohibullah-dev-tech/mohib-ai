@@ -22,3 +22,4 @@ async def get_provider_status() -> ProviderStatusResponse:
 async def run_provider_benchmark():
     """Run comparative benchmark suite evaluating latency, quality, and cost for Gemini vs OpenAI."""
     return await benchmark_runner.run_benchmark()
+

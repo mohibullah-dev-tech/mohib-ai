@@ -124,3 +124,4 @@ class OpenAIProvider(AIProviderInterface):
                     return {"status": f"http_{res.status_code}", "model": self.model_name, "available": False}
         except Exception as e:
             return {"status": "unreachable", "model": self.model_name, "available": False, "error": str(e)}
+
